@@ -1,0 +1,5 @@
+this is a fork of https://github.com/google-gemini/gemini-cli
+all code changes should allow future polling of changes from the main repo.
+dont over complicated the code but try to keep this in mind so can sync.
+the new brand is Codora.
+in your code try to keep the original code style from gemini-cli.

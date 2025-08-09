@@ -1,7 +1,7 @@
 {
   "name": "@codora/providers",
   "version": "0.1.0",
-  "description": "Codora providers for Gemini CLI",
+  "description": "Codora providers for the Codora CLI (Gemini CLI fork)",
   "type": "module",
   "main": "dist/index.js",
   "types": "src/index.ts",

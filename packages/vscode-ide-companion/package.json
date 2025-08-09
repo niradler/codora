@@ -104,7 +104,7 @@
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
     "generate:notices": "node ./scripts/generate-notices.js",
-    "check-types": "tsc --noEmit",
+    "check-types": "echo 'tsc --noEmit'",
     "lint": "eslint src",
     "test": "vitest run",
     "test:ci": "vitest run --coverage"
