@@ -27,6 +27,8 @@ export async function executeToolCall(
   toolRegistry: ToolRegistry,
   abortSignal?: AbortSignal,
 ): Promise<ToolCallResponseInfo> {
+  // Debug logging for tool execution will be added to tool result
+
   const tool = toolRegistry.getTool(toolCallRequest.name);
 
   const startTime = Date.now();
@@ -34,6 +36,10 @@ export async function executeToolCall(
     const error = new Error(
       `Tool "${toolCallRequest.name}" not found in registry.`,
     );
+
+    // Show tool execution error in chat
+    const errorMessage = `❌ Tool execution failed: ${toolCallRequest.name}\nError: ${error.message}`;
+
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
       'event.name': 'tool_call',
@@ -53,11 +59,11 @@ export async function executeToolCall(
           functionResponse: {
             id: toolCallRequest.callId,
             name: toolCallRequest.name,
-            response: { error: error.message },
+            response: { error: errorMessage },
           },
         },
       ],
-      resultDisplay: error.message,
+      resultDisplay: errorMessage,
       error,
       errorType: ToolErrorType.TOOL_NOT_REGISTERED,
     };
@@ -111,16 +117,35 @@ export async function executeToolCall(
       decision: ToolCallDecision.AUTO_ACCEPT,
     });
 
+    // Handle tool execution errors
+    let finalToolOutput = tool_output;
+    let finalDisplayOutput = tool_display;
+
+    if (toolResult.error !== undefined) {
+      // Show tool execution error in chat
+      const errorMessage = `❌ Tool execution failed: ${toolCallRequest.name}\nError: ${toolResult.error.message}`;
+      finalDisplayOutput = errorMessage;
+
+      // Also modify the tool output for the LLM
+      if (typeof tool_output === 'string') {
+        finalToolOutput = errorMessage;
+      } else if (Array.isArray(tool_output)) {
+        finalToolOutput = [{ text: errorMessage }];
+      } else {
+        finalToolOutput = { text: errorMessage };
+      }
+    }
+
     const response = convertToFunctionResponse(
       toolCallRequest.name,
       toolCallRequest.callId,
-      tool_output,
+      finalToolOutput,
     );
 
     return {
       callId: toolCallRequest.callId,
       responseParts: response,
-      resultDisplay: tool_display,
+      resultDisplay: finalDisplayOutput,
       error:
         toolResult.error === undefined
           ? undefined
@@ -130,6 +155,10 @@ export async function executeToolCall(
     };
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
+
+    // Show tool execution error in chat
+    const errorMessage = `❌ Tool execution failed: ${toolCallRequest.name}\nError: ${error.message}`;
+
     const durationMs = Date.now() - startTime;
     logToolCall(config, {
       'event.name': 'tool_call',
@@ -149,11 +178,11 @@ export async function executeToolCall(
           functionResponse: {
             id: toolCallRequest.callId,
             name: toolCallRequest.name,
-            response: { error: error.message },
+            response: { error: errorMessage },
           },
         },
       ],
-      resultDisplay: error.message,
+      resultDisplay: errorMessage,
       error,
       errorType: ToolErrorType.UNHANDLED_EXCEPTION,
     };

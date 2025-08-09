@@ -13,15 +13,36 @@ import type {
   GenerateContentParameters,
   GenerateContentResponse,
   Content,
+  FunctionCall,
+  FunctionDeclaration,
 } from '@google/genai';
 import { ProviderConfig, ProviderContentGenerator } from './types.js';
-import { contentsToText, toContentList } from './utils.js';
+import { contentsToText, toContentList, extractTools } from './utils.js';
 
 export function createOpenAIProvider(
   _config: ProviderConfig,
 ): ProviderContentGenerator {
   const apiKey = (globalThis as any)?.process?.env?.OPENAI_API_KEY || '';
   const client = new OpenAI({ apiKey });
+
+  function convertGeminiToolsToOpenAI(tools: FunctionDeclaration[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
+    return tools.map(tool => ({
+      type: 'function' as const,
+      function: {
+        name: tool.name!,
+        description: tool.description || '',
+        parameters: (tool.parameters as any) || { type: 'object', properties: {} }
+      }
+    }));
+  }
+
+  function convertOpenAIToolCallsToGemini(toolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[]): FunctionCall[] {
+    return toolCalls.map(toolCall => ({
+      name: toolCall.function.name,
+      args: JSON.parse(toolCall.function.arguments || '{}'),
+      id: toolCall.id
+    }));
+  }
 
   return {
     async generateContent(
@@ -33,16 +54,30 @@ export function createOpenAIProvider(
         req.model ||
         (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OPENAI ||
         'gpt-4o-mini';
+      
+      // Extract and convert tools
+      const tools = extractTools(req.config?.tools);
+      const openaiTools = tools.length > 0 ? convertGeminiToolsToOpenAI(tools) : undefined;
+      
       const chat = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
         temperature: req.config?.temperature as number | undefined,
+        ...(openaiTools && { tools: openaiTools, tool_choice: 'auto' })
       });
-      const text = chat.choices?.[0]?.message?.content || '';
+      
+      const message = chat.choices?.[0]?.message;
+      const text = message?.content || '';
+      const functionCalls = message?.tool_calls ? convertOpenAIToolCallsToGemini(message.tool_calls) : [];
+      
       return {
         candidates: [
-          { content: { role: 'model', parts: [{ text }] } as Content } as never,
+          { 
+            content: { role: 'model', parts: [{ text }] } as Content,
+            ...(functionCalls.length > 0 && { functionCalls })
+          } as never,
         ],
+        ...(functionCalls.length > 0 && { functionCalls })
       } as unknown as GenerateContentResponse;
     },
 
@@ -55,22 +90,76 @@ export function createOpenAIProvider(
         req.model ||
         (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OPENAI ||
         'gpt-4o-mini';
+      
+      // Extract and convert tools
+      const tools = extractTools(req.config?.tools);
+      const openaiTools = tools.length > 0 ? convertGeminiToolsToOpenAI(tools) : undefined;
+      
       const stream = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
         stream: true,
         temperature: req.config?.temperature as number | undefined,
+        ...(openaiTools && { tools: openaiTools, tool_choice: 'auto' })
       });
+      
       async function* wrap() {
+        const toolCallsAccumulator: { [id: string]: { name?: string; arguments?: string } } = {};
+        
         for await (const part of stream) {
-          const text = part?.choices?.[0]?.delta?.content || '';
-          if (!text) continue;
+          const delta = part?.choices?.[0]?.delta;
+          const text = delta?.content || '';
+          
+          // Handle tool calls
+          if (delta?.tool_calls) {
+            for (const toolCall of delta.tool_calls) {
+              if (!toolCall.id) continue;
+              
+              if (!toolCallsAccumulator[toolCall.id]) {
+                toolCallsAccumulator[toolCall.id] = {};
+              }
+              
+              if (toolCall.function?.name) {
+                toolCallsAccumulator[toolCall.id].name = toolCall.function.name;
+              }
+              
+              if (toolCall.function?.arguments) {
+                toolCallsAccumulator[toolCall.id].arguments = 
+                  (toolCallsAccumulator[toolCall.id].arguments || '') + toolCall.function.arguments;
+              }
+            }
+          }
+          
+          // Send text content if available
+          if (text) {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text }] } as Content,
+                } as never,
+              ],
+            } as unknown as GenerateContentResponse;
+          }
+        }
+        
+        // Send complete tool calls at the end
+        const completedToolCalls = Object.entries(toolCallsAccumulator)
+          .filter(([_, call]) => call.name && call.arguments)
+          .map(([id, call]) => ({
+            name: call.name!,
+            args: JSON.parse(call.arguments || '{}'),
+            id
+          }));
+        
+        if (completedToolCalls.length > 0) {
           yield {
             candidates: [
               {
-                content: { role: 'model', parts: [{ text }] } as Content,
+                content: { role: 'model', parts: [{ text: '' }] } as Content,
+                functionCalls: completedToolCalls
               } as never,
             ],
+            functionCalls: completedToolCalls
           } as unknown as GenerateContentResponse;
         }
       }

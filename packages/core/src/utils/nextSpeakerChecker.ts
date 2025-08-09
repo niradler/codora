@@ -108,6 +108,28 @@ export async function checkNextSpeaker(
   ];
 
   try {
+    // Check if we're using a non-Gemini provider
+    const isUsingGemini =
+      !process.env.CODORA_PROVIDER || process.env.CODORA_PROVIDER === 'gemini';
+
+    if (!isUsingGemini) {
+      // For non-Gemini providers, use a simple heuristic instead of LLM call
+      // to avoid provider-specific JSON generation issues
+      const lastMessage = curatedHistory[curatedHistory.length - 1];
+
+      // Simple heuristic: if the last message ends with a question mark or seems incomplete,
+      // assume the model should continue speaking
+      const lastText = lastMessage?.parts?.[0]?.text || '';
+      const endsWithQuestion = lastText.trim().endsWith('?');
+      const seemsIncomplete = lastText.length < 50 || lastText.endsWith('...');
+
+      return {
+        reasoning: `Heuristic check for ${process.env.CODORA_PROVIDER} provider: ${endsWithQuestion || seemsIncomplete ? 'seems incomplete' : 'seems complete'}`,
+        next_speaker: endsWithQuestion || seemsIncomplete ? 'model' : 'user',
+      };
+    }
+
+    // For Gemini, use the existing JSON generation approach
     const parsedResponse = (await geminiClient.generateJson(
       contents,
       RESPONSE_SCHEMA,
@@ -124,8 +146,9 @@ export async function checkNextSpeaker(
     }
     return null;
   } catch (error) {
+    const providerName = process.env.CODORA_PROVIDER || 'gemini';
     console.warn(
-      'Failed to talk to Gemini endpoint when seeing if conversation should continue.',
+      `Failed to determine next speaker with ${providerName} provider when checking if conversation should continue.`,
       error,
     );
     return null;

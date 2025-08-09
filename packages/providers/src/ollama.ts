@@ -13,9 +13,16 @@ import {
   GenerateContentParameters,
   GenerateContentResponse,
   Content,
+  FunctionCall,
 } from '@google/genai';
 import { ProviderConfig, ProviderContentGenerator } from './types.js';
-import { contentsToText, toContentList } from './utils.js';
+import {
+  contentsToText,
+  toContentList,
+  extractTools,
+  createToolSystemPrompt,
+  parseFunctionCall,
+} from './utils.js';
 
 export function createOllamaProvider(
   config: ProviderConfig,
@@ -31,13 +38,19 @@ export function createOllamaProvider(
     ): Promise<GenerateContentResponse> {
       const cs = toContentList(req.contents);
       const prompt = contentsToText(cs);
+
+      // Extract tools and add to system prompt
+      const tools = extractTools(req.config?.tools);
+      const toolsPrompt = createToolSystemPrompt(tools);
+      const finalPrompt = prompt + toolsPrompt;
+
       const resolvedModel =
         req.model ||
         (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
         '';
       const data = (await client.chat({
         model: resolvedModel,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: finalPrompt }],
         stream: false,
         options: {
           temperature: req.config?.temperature,
@@ -47,10 +60,29 @@ export function createOllamaProvider(
         },
       })) as { message?: { content?: string }; response?: string };
       const text = data?.message?.content || data?.response || '';
+
+      // Parse potential function calls from the response
+      const functionCall = parseFunctionCall(text);
+      const functionCalls: FunctionCall[] = functionCall ? [functionCall] : [];
+
+      // Clean text by removing function call JSON if present
+      const cleanText = functionCall
+        ? text
+            .replace(
+              /\{[\s\S]*?"function_call"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/,
+              '',
+            )
+            .trim()
+        : text;
+
       return {
         candidates: [
-          { content: { role: 'model', parts: [{ text }] } as Content } as never,
+          {
+            content: { role: 'model', parts: [{ text: cleanText }] } as Content,
+            ...(functionCalls.length > 0 && { functionCalls }),
+          } as never,
         ],
+        ...(functionCalls.length > 0 && { functionCalls }),
       } as unknown as GenerateContentResponse;
     },
 
@@ -59,13 +91,19 @@ export function createOllamaProvider(
     ): Promise<AsyncGenerator<GenerateContentResponse>> {
       const cs = toContentList(req.contents);
       const prompt = contentsToText(cs);
+
+      // Extract tools and add to system prompt
+      const tools = extractTools(req.config?.tools);
+      const toolsPrompt = createToolSystemPrompt(tools);
+      const finalPrompt = prompt + toolsPrompt;
+
       const resolvedModel =
         req.model ||
         (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
         '';
       const stream = (await client.chat({
         model: resolvedModel,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: finalPrompt }],
         stream: true,
         options: {
           temperature: req.config?.temperature,
@@ -79,16 +117,49 @@ export function createOllamaProvider(
       }>;
 
       async function* wrap() {
+        let accumulatedText = '';
+        let functionCallProcessed = false;
+
         for await (const part of stream) {
           const text = part?.message?.content || part?.response || '';
           if (!text) continue;
-          yield {
-            candidates: [
-              {
-                content: { role: 'model', parts: [{ text }] } as Content,
-              } as never,
-            ],
-          } as unknown as GenerateContentResponse;
+
+          accumulatedText += text;
+
+          // Check for complete function call in accumulated text
+          const functionCall = parseFunctionCall(accumulatedText);
+
+          if (functionCall && !functionCallProcessed) {
+            functionCallProcessed = true;
+
+            // Send function call response
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: '' }] } as Content,
+                  functionCalls: [functionCall],
+                } as never,
+              ],
+              functionCalls: [functionCall],
+            } as unknown as GenerateContentResponse;
+
+            // Clean the accumulated text
+            accumulatedText = accumulatedText
+              .replace(
+                /\{[\s\S]*?"function_call"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/,
+                '',
+              )
+              .trim();
+          } else if (!functionCall) {
+            // Regular text streaming
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text }] } as Content,
+                } as never,
+              ],
+            } as unknown as GenerateContentResponse;
+          }
         }
       }
       return wrap();

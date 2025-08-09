@@ -11,6 +11,9 @@ import type {
   EmbedContentResponse,
   GenerateContentParameters,
   GenerateContentResponse,
+  FunctionCall,
+  FunctionDeclaration,
+  Tool,
 } from '@google/genai';
 
 export type ProviderName = 'gemini' | 'ollama' | 'bedrock' | 'openai';

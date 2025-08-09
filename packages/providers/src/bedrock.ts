@@ -17,9 +17,16 @@ import type {
   GenerateContentParameters,
   GenerateContentResponse,
   Content,
+  FunctionCall,
 } from '@google/genai';
 import { ProviderConfig, ProviderContentGenerator } from './types.js';
-import { contentsToText, toContentList } from './utils.js';
+import {
+  contentsToText,
+  toContentList,
+  extractTools,
+  createToolSystemPrompt,
+  parseFunctionCall,
+} from './utils.js';
 
 export function createBedrockProvider(
   _config: ProviderConfig,
@@ -30,8 +37,14 @@ export function createBedrockProvider(
   function requestBodyFromContents(req: GenerateContentParameters): unknown {
     const cs = toContentList(req.contents);
     const text = contentsToText(cs);
+
+    // Extract tools and add to prompt
+    const tools = extractTools(req.config?.tools);
+    const toolsPrompt = createToolSystemPrompt(tools);
+    const finalText = text + toolsPrompt;
+
     return {
-      inputText: text,
+      inputText: finalText,
       textGenerationConfig: {
         temperature: req.config?.temperature,
         topP: req.config?.topP,
@@ -63,10 +76,29 @@ export function createBedrockProvider(
         | undefined;
       const text =
         payload?.outputText || payload?.results?.[0]?.outputText || '';
+
+      // Parse potential function calls from the response
+      const functionCall = parseFunctionCall(text);
+      const functionCalls: FunctionCall[] = functionCall ? [functionCall] : [];
+
+      // Clean text by removing function call JSON if present
+      const cleanText = functionCall
+        ? text
+            .replace(
+              /\{[\s\S]*?"function_call"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/,
+              '',
+            )
+            .trim()
+        : text;
+
       return {
         candidates: [
-          { content: { role: 'model', parts: [{ text }] } as Content } as never,
+          {
+            content: { role: 'model', parts: [{ text: cleanText }] } as Content,
+            ...(functionCalls.length > 0 && { functionCalls }),
+          } as never,
         ],
+        ...(functionCalls.length > 0 && { functionCalls }),
       } as unknown as GenerateContentResponse;
     },
 
@@ -87,6 +119,9 @@ export function createBedrockProvider(
       const resp = await client.send(command);
       const stream = resp.body;
       async function* wrap() {
+        let accumulatedText = '';
+        let functionCallProcessed = false;
+
         for await (const event of stream as AsyncGenerator<{
           chunk?: { bytes?: Uint8Array };
         }>) {
@@ -101,13 +136,42 @@ export function createBedrockProvider(
             | undefined;
           const text = json?.outputText || json?.delta || '';
           if (!text) continue;
-          yield {
-            candidates: [
-              {
-                content: { role: 'model', parts: [{ text }] } as Content,
-              } as never,
-            ],
-          } as unknown as GenerateContentResponse;
+
+          accumulatedText += text;
+
+          // Check for complete function call in accumulated text
+          const functionCall = parseFunctionCall(accumulatedText);
+
+          if (functionCall && !functionCallProcessed) {
+            functionCallProcessed = true;
+            // Send function call response
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: '' }] } as Content,
+                  functionCalls: [functionCall],
+                } as never,
+              ],
+              functionCalls: [functionCall],
+            } as unknown as GenerateContentResponse;
+
+            // Clean the accumulated text
+            accumulatedText = accumulatedText
+              .replace(
+                /\{[\s\S]*?"function_call"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/,
+                '',
+              )
+              .trim();
+          } else if (!functionCall) {
+            // Regular text streaming
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text }] } as Content,
+                } as never,
+              ],
+            } as unknown as GenerateContentResponse;
+          }
         }
       }
       return wrap();
