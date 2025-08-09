@@ -35,7 +35,7 @@ function updateWorkspacePath(context: vscode.ExtensionContext) {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
+  logger = vscode.window.createOutputChannel('Codora CLI IDE Companion');
   log = createLogger(context, logger);
   log('Extension activated');
 
@@ -85,12 +85,12 @@ export async function activate(context: vscode.ExtensionContext) {
   if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY)) {
     void vscode.window
       .showInformationMessage(
-        'Gemini CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
-        'Re-launch Gemini CLI',
+        'Codora CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
+        'Re-launch Codora CLI',
       )
       .then(
         (selection) => {
-          if (selection === 'Re-launch Gemini CLI') {
+          if (selection === 'Re-launch Codora CLI') {
             void vscode.commands.executeCommand('gemini-cli.runGeminiCLI');
           }
         },
@@ -107,7 +107,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand('gemini-cli.runGeminiCLI', () => {
       const geminiCmd = 'gemini';
-      const terminal = vscode.window.createTerminal(`Gemini CLI`);
+      const terminal = vscode.window.createTerminal(`Codora CLI`);
       terminal.show();
       terminal.sendText(geminiCmd);
     }),

@@ -47,6 +47,7 @@ const logger = {
 
 export interface CliArgs {
   model: string | undefined;
+  provider?: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
   debug: boolean | undefined;
@@ -75,9 +76,9 @@ export interface CliArgs {
 
 export async function parseArguments(): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
-    .scriptName('gemini')
+    .scriptName('codora')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+      'Usage: codora [options] [command]\n\nCodora CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
     .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
@@ -86,6 +87,11 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'string',
           description: `Model`,
           default: process.env.GEMINI_MODEL,
+        })
+        .option('provider', {
+          type: 'string',
+          choices: ['gemini', 'ollama', 'bedrock', 'openai'],
+          description: 'LLM provider to use',
         })
         .option('prompt', {
           alias: 'p',

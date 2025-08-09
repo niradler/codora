@@ -118,6 +118,28 @@ export async function createContentGenerator(
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
+
+  const providerName = (globalThis as any)?.process?.env?.CODORA_PROVIDER as
+    | string
+    | undefined;
+  if (providerName) {
+    try {
+      const moduleName = '@codora/providers';
+      const providersModule = await import(moduleName);
+      const provider = providersModule.createProvider({
+        provider: providerName as 'ollama' | 'bedrock' | 'gemini',
+        model: config.model,
+        proxy: config.proxy,
+        authType: config.authType,
+      });
+      return new LoggingContentGenerator(
+        provider as unknown as ContentGenerator,
+        gcConfig,
+      );
+    } catch {
+      void 0;
+    }
+  }
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL

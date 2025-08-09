@@ -145,6 +145,15 @@ export async function main() {
   }
 
   const argv = await parseArguments();
+  if (argv.provider) {
+    process.env.CODORA_PROVIDER = argv.provider;
+  }
+  if (!argv.model && argv.provider) {
+    const envKey = `CODORA_DEFAULT_MODEL_${argv.provider.toUpperCase()}`;
+    if (process.env[envKey]) {
+      process.env.GEMINI_MODEL = process.env[envKey];
+    }
+  }
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,

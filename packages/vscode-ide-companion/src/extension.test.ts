@@ -80,8 +80,8 @@ describe('activate', () => {
     vi.mocked(context.globalState.get).mockReturnValue(undefined);
     await activate(context);
     expect(showInformationMessageMock).toHaveBeenCalledWith(
-      'Gemini CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
-      'Re-launch Gemini CLI',
+      'Codora CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
+      'Re-launch Codora CLI',
     );
   });
 
@@ -91,7 +91,7 @@ describe('activate', () => {
     expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
   });
 
-  it('should launch the Gemini CLI when the user clicks the button', async () => {
+  it('should launch the Codora CLI when the user clicks the button', async () => {
     const showInformationMessageMock = vi
       .mocked(vscode.window.showInformationMessage)
       .mockResolvedValue('Re-launch Gemini CLI' as never);
