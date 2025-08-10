@@ -1,8 +1,5 @@
 # Codora CLI
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
-
-![Codora CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
 This repository contains the Codora CLI (a fork of Google’s Gemini CLI) – a command-line AI workflow tool that connects to your tools, understands your code and accelerates your workflows.
 
