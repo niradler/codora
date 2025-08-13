@@ -24,12 +24,48 @@ import {
   parseFunctionCall,
 } from './utils.js';
 
+function convertGeminiToOllamaMessages(
+  contents: Content[],
+): Array<{ role: string; content: string }> {
+  const messages: Array<{ role: string; content: string }> = [];
+
+  for (const content of contents) {
+    const textParts: string[] = [];
+
+    for (const part of content.parts || []) {
+      if (typeof part === 'string') {
+        textParts.push(part);
+      } else if (part.text) {
+        textParts.push(part.text);
+      } else if (part.functionResponse) {
+        // Convert function response to readable text for Ollama
+        const response = part.functionResponse;
+        const toolName = response.name || 'unknown_tool';
+        const output =
+          response.response?.output || JSON.stringify(response.response || {});
+        textParts.push(`Tool "${toolName}" completed. Result: ${output}`);
+      }
+    }
+
+    const text = textParts.join('');
+    if (!text.trim()) continue;
+
+    const role = content.role === 'model' ? 'assistant' : 'user';
+    messages.push({ role, content: text });
+  }
+
+  return messages;
+}
+
 export function createOllamaProvider(
-  config: ProviderConfig,
+  _config: ProviderConfig,
 ): ProviderContentGenerator {
   const host =
-    (globalThis as any)?.process?.env?.OLLAMA_BASE_URL ||
-    'http://127.0.0.1:11434';
+    (
+      globalThis as unknown as {
+        process?: { env?: { OLLAMA_BASE_URL?: string } };
+      }
+    )?.process?.env?.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
   const client = new Ollama({ host });
 
   return {
@@ -37,20 +73,34 @@ export function createOllamaProvider(
       req: GenerateContentParameters,
     ): Promise<GenerateContentResponse> {
       const cs = toContentList(req.contents);
-      const prompt = contentsToText(cs);
+      const messages = convertGeminiToOllamaMessages(cs);
 
       // Extract tools and add to system prompt
       const tools = extractTools(req.config?.tools);
       const toolsPrompt = createToolSystemPrompt(tools);
-      const finalPrompt = prompt + toolsPrompt;
+
+      // If we have tools, add a system message at the beginning
+      if (toolsPrompt && messages.length > 0) {
+        // Prepend tools information to the first user message
+        if (messages[0].role === 'user') {
+          messages[0].content = toolsPrompt + '\n\n' + messages[0].content;
+        } else {
+          // Insert system message at the beginning
+          messages.unshift({ role: 'user', content: toolsPrompt });
+        }
+      }
 
       const resolvedModel =
         req.model ||
-        (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
+        (
+          globalThis as unknown as {
+            process?: { env?: { CODORA_DEFAULT_MODEL_OLLAMA?: string } };
+          }
+        )?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
         '';
       const data = (await client.chat({
         model: resolvedModel,
-        messages: [{ role: 'user', content: finalPrompt }],
+        messages,
         stream: false,
         options: {
           temperature: req.config?.temperature,
@@ -90,20 +140,34 @@ export function createOllamaProvider(
       req: GenerateContentParameters,
     ): Promise<AsyncGenerator<GenerateContentResponse>> {
       const cs = toContentList(req.contents);
-      const prompt = contentsToText(cs);
+      const messages = convertGeminiToOllamaMessages(cs);
 
       // Extract tools and add to system prompt
       const tools = extractTools(req.config?.tools);
       const toolsPrompt = createToolSystemPrompt(tools);
-      const finalPrompt = prompt + toolsPrompt;
+
+      // If we have tools, add a system message at the beginning
+      if (toolsPrompt && messages.length > 0) {
+        // Prepend tools information to the first user message
+        if (messages[0].role === 'user') {
+          messages[0].content = toolsPrompt + '\n\n' + messages[0].content;
+        } else {
+          // Insert system message at the beginning
+          messages.unshift({ role: 'user', content: toolsPrompt });
+        }
+      }
 
       const resolvedModel =
         req.model ||
-        (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
+        (
+          globalThis as unknown as {
+            process?: { env?: { CODORA_DEFAULT_MODEL_OLLAMA?: string } };
+          }
+        )?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
         '';
       const stream = (await client.chat({
         model: resolvedModel,
-        messages: [{ role: 'user', content: finalPrompt }],
+        messages,
         stream: true,
         options: {
           temperature: req.config?.temperature,
@@ -191,7 +255,11 @@ export function createOllamaProvider(
       }
       const model =
         (req as unknown as { model?: string }).model ||
-        (globalThis as any)?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
+        (
+          globalThis as unknown as {
+            process?: { env?: { CODORA_DEFAULT_MODEL_OLLAMA?: string } };
+          }
+        )?.process?.env?.CODORA_DEFAULT_MODEL_OLLAMA ||
         '';
       const resp = (await client.embed({ model, input: text })) as {
         embeddings?: number[][];
