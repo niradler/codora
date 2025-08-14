@@ -1,6 +1,6 @@
-# Welcome to Gemini CLI documentation
+# Welcome to Codora CLI documentation
 
-This documentation provides a comprehensive guide to installing, using, and developing Gemini CLI. This tool lets you interact with Gemini models through a command-line interface.
+This documentation provides a comprehensive guide to installing, using, and developing Codora CLI. Codora is a fork of the Gemini CLI, adding multi-provider support while keeping Gemini as the default provider.
 
 ## Overview
 
@@ -10,8 +10,8 @@ Gemini CLI brings the capabilities of Gemini models to your terminal in an inter
 
 This documentation is organized into the following sections:
 
-- **[Execution and Deployment](./deployment.md):** Information for running Gemini CLI.
-- **[Architecture Overview](./architecture.md):** Understand the high-level design of Gemini CLI, including its components and how they interact.
+- **[Execution and Deployment](./deployment.md):** Information for running Codora CLI.
+- **[Architecture Overview](./architecture.md):** Understand the high-level design of Codora CLI, including its components and how they interact.
 - **CLI Usage:** Documentation for `packages/cli`.
   - **[CLI Introduction](./cli/index.md):** Overview of the command-line interface.
   - **[Commands](./cli/commands.md):** Description of available CLI commands.
@@ -33,6 +33,6 @@ This documentation is organized into the following sections:
 - **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for contributors and developers, including setup, building, testing, and coding conventions.
 - **[NPM Workspaces and Publishing](./npm.md):** Details on how the project's packages are managed and published.
 - **[Troubleshooting Guide](./troubleshooting.md):** Find solutions to common problems and FAQs.
-- **[Terms of Service and Privacy Notice](./tos-privacy.md):** Information on the terms of service and privacy notices applicable to your use of Gemini CLI.
+- **[Terms of Service and Privacy Notice](./tos-privacy.md):** Information on the terms of service and privacy notices applicable to your use of the Codora CLI.
 
-We hope this documentation helps you make the most of the Gemini CLI!
+We hope this documentation helps you make the most of the Codora CLI!

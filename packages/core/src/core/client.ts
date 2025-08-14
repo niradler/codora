@@ -52,6 +52,11 @@ import {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 function isThinkingSupported(model: string) {
+  // Only enable thinking for Gemini models when using Gemini provider
+  const isUsingGemini =
+    !process.env.CODORA_PROVIDER || process.env.CODORA_PROVIDER === 'gemini';
+  if (!isUsingGemini) return false;
+
   if (model.startsWith('gemini-2.5')) return true;
   return false;
 }

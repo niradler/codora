@@ -145,6 +145,20 @@ export async function main() {
   }
 
   const argv = await parseArguments();
+  if (argv.provider) {
+    process.env.CODORA_PROVIDER = argv.provider;
+    settings.setValue(SettingScope.User, 'selectedProvider', argv.provider);
+  } else if (settings.merged.selectedProvider) {
+    process.env.CODORA_PROVIDER = settings.merged.selectedProvider;
+  }
+
+  const selectedProvider = process.env.CODORA_PROVIDER || argv.provider;
+  if (!argv.model && selectedProvider) {
+    const envKey = `CODORA_DEFAULT_MODEL_${selectedProvider.toUpperCase()}`;
+    if (process.env[envKey]) {
+      process.env.GEMINI_MODEL = process.env[envKey];
+    }
+  }
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,
@@ -172,15 +186,14 @@ export async function main() {
     process.exit(0);
   }
 
-  // Set a default auth type if one isn't set.
-  if (!settings.merged.selectedAuthType) {
-    if (process.env.CLOUD_SHELL === 'true') {
-      settings.setValue(
-        SettingScope.User,
-        'selectedAuthType',
-        AuthType.CLOUD_SHELL,
-      );
-    }
+  // Set a default auth type only for Cloud Shell environments
+  if (!settings.merged.selectedAuthType && process.env.CLOUD_SHELL === 'true') {
+    settings.setValue(
+      SettingScope.User,
+      'selectedAuthType',
+      AuthType.CLOUD_SHELL,
+    );
+    settings.setValue(SettingScope.User, 'selectedProvider', 'gemini');
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());

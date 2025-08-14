@@ -395,6 +395,37 @@ export class Config {
     this.inFallbackMode = false;
   }
 
+  async refreshModel() {
+    // Save the current conversation history before creating a new client
+    let existingHistory: Content[] = [];
+    if (this.geminiClient && this.geminiClient.isInitialized()) {
+      existingHistory = this.geminiClient.getHistory();
+    }
+
+    // Create new content generator config with current auth but new model
+    const currentAuthType = this.contentGeneratorConfig?.authType;
+    const newContentGeneratorConfig = createContentGeneratorConfig(
+      this,
+      currentAuthType,
+    );
+
+    // Create and initialize new client in local variable first
+    const newGeminiClient = new GeminiClient(this);
+    await newGeminiClient.initialize(newContentGeneratorConfig);
+
+    // Only assign to instance properties after successful initialization
+    this.contentGeneratorConfig = newContentGeneratorConfig;
+    this.geminiClient = newGeminiClient;
+
+    // Restore the conversation history to the new client
+    if (existingHistory.length > 0) {
+      this.geminiClient.setHistory(existingHistory);
+    }
+
+    // Reset the session flag since we're explicitly changing model
+    this.inFallbackMode = false;
+  }
+
   getSessionId(): string {
     return this.sessionId;
   }

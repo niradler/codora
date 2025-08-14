@@ -1,0 +1,32 @@
+{
+  "name": "@codora/providers",
+  "version": "0.1.0",
+  "description": "Codora providers for the Codora CLI (Gemini CLI fork)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "node ../../scripts/build_package.js",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@google/genai": "1.9.0",
+    "ollama": "^0.5.17",
+    "@aws-sdk/client-bedrock-runtime": "^3.676.0",
+    "openai": "^4.56.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

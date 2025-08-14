@@ -19,9 +19,7 @@ export const useAuthCommand = (
   setAuthError: (error: string | null) => void,
   config: Config,
 ) => {
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(
-    settings.merged.selectedAuthType === undefined,
-  );
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
 
   const openAuthDialog = useCallback(() => {
     setIsAuthDialogOpen(true);
@@ -32,7 +30,19 @@ export const useAuthCommand = (
   useEffect(() => {
     const authFlow = async () => {
       const authType = settings.merged.selectedAuthType;
-      if (isAuthDialogOpen || !authType) {
+      const provider = settings.merged.selectedProvider;
+
+      if (isAuthDialogOpen || (!authType && provider === 'gemini')) {
+        return;
+      }
+
+      if (provider !== 'gemini') {
+        setIsAuthenticating(false);
+        return;
+      }
+
+      if (!authType) {
+        setIsAuthenticating(false);
         return;
       }
 

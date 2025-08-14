@@ -124,20 +124,31 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       return 'Could not identify command root to obtain permission from user.';
     }
     if (params.directory) {
+      const workspaceContext = this.config.getWorkspaceContext();
+
+      if (params.directory === '.') {
+        return null;
+      }
+
       if (path.isAbsolute(params.directory)) {
-        return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
-      }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const matchingDirs = workspaceDirs.filter(
-        (dir) => path.basename(dir) === params.directory,
-      );
+        // Allow absolute paths if they are within the workspace
+        if (!workspaceContext.isPathWithinWorkspace(params.directory)) {
+          return 'Absolute directory path must be within the workspace directories.';
+        }
+      } else {
+        // For relative paths, use the existing logic to find matching workspace directories
+        const workspaceDirs = workspaceContext.getDirectories();
+        const matchingDirs = workspaceDirs.filter(
+          (dir) => path.basename(dir) === params.directory,
+        );
 
-      if (matchingDirs.length === 0) {
-        return `Directory '${params.directory}' is not a registered workspace directory.`;
-      }
+        if (matchingDirs.length === 0) {
+          return `Directory '${params.directory}' is not a registered workspace directory.`;
+        }
 
-      if (matchingDirs.length > 1) {
-        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
+        if (matchingDirs.length > 1) {
+          return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
+        }
       }
     }
     return null;
@@ -220,10 +231,22 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = path.resolve(
-        this.config.getTargetDir(),
-        params.directory || '',
-      );
+      let cwd: string;
+      if (!params.directory || params.directory === '.') {
+        cwd = this.config.getTargetDir();
+      } else if (path.isAbsolute(params.directory)) {
+        cwd = params.directory;
+      } else {
+        const workspaceDirs = this.config
+          .getWorkspaceContext()
+          .getDirectories();
+        const matchingDir = workspaceDirs.find(
+          (dir) => path.basename(dir) === params.directory,
+        );
+        cwd =
+          matchingDir ||
+          path.resolve(this.config.getTargetDir(), params.directory);
+      }
 
       let cumulativeStdout = '';
       let cumulativeStderr = '';

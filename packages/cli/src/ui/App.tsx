@@ -22,6 +22,8 @@ import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useProviderCommand } from './hooks/useProviderCommand.js';
+import { useModelCommand } from './hooks/useModelCommand.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
@@ -36,6 +38,8 @@ import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
+import { ProviderDialog } from './components/ProviderDialog.js';
+import { ModelDialog } from './components/ModelDialog.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { FolderTrustDialog } from './components/FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
@@ -165,6 +169,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [themeError, setThemeError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const [modelError, setModelError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
@@ -244,6 +250,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     useFolderTrust(settings);
 
   const {
+    isProviderDialogOpen,
+    openProviderDialog,
+    handleProviderSelect,
+    handleTriggerAuth,
+  } = useProviderCommand(settings, setProviderError, config);
+
+  const { isModelDialogOpen, openModelDialog, handleModelSelect } =
+    useModelCommand(settings, setModelError, setCurrentModel, config);
+
+  const {
     isAuthDialogOpen,
     openAuthDialog,
     handleAuthSelect,
@@ -253,7 +269,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     if (settings.merged.selectedAuthType && !settings.merged.useExternalAuth) {
-      const error = validateAuthMethod(settings.merged.selectedAuthType);
+      const error = validateAuthMethod(
+        settings.merged.selectedAuthType,
+        settings.merged.selectedProvider,
+      );
       if (error) {
         setAuthError(error);
         openAuthDialog();
@@ -261,6 +280,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     settings.merged.selectedAuthType,
+    settings.merged.selectedProvider,
     settings.merged.useExternalAuth,
     openAuthDialog,
     setAuthError,
@@ -337,10 +357,22 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [config, addItem, settings.merged]);
 
   // Watch for model changes (e.g., from Flash fallback)
+  // but don't override manual model changes from settings
+  const [lastSettingsModel, setLastSettingsModel] = useState(
+    settings.merged.model,
+  );
   useEffect(() => {
+    const settingsModel = settings.merged.model;
+    if (settingsModel !== lastSettingsModel) {
+      setLastSettingsModel(settingsModel);
+      setCurrentModel(settingsModel || config.getModel());
+      return; // Don't check config model if settings changed
+    }
+
     const checkModelChange = () => {
       const configModel = config.getModel();
-      if (configModel !== currentModel) {
+      // Only update from config if it differs AND it's not the settings model
+      if (configModel !== currentModel && configModel !== settingsModel) {
         setCurrentModel(configModel);
       }
     };
@@ -350,7 +382,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     const interval = setInterval(checkModelChange, 1000); // Check every second
 
     return () => clearInterval(interval);
-  }, [config, currentModel]);
+  }, [config, currentModel, settings.merged.model, lastSettingsModel]);
 
   // Set up Flash fallback handler
   useEffect(() => {
@@ -499,6 +531,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openThemeDialog,
     openAuthDialog,
     openEditorDialog,
+    openProviderDialog,
+    openModelDialog,
     toggleCorgiMode,
     setQuittingMessages,
     openPrivacyNotice,
@@ -777,6 +811,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       !initialPromptSubmitted.current &&
       !isAuthenticating &&
       !isAuthDialogOpen &&
+      !isProviderDialogOpen &&
+      !isModelDialogOpen &&
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
       !showPrivacyNotice &&
@@ -790,6 +826,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     submitQuery,
     isAuthenticating,
     isAuthDialogOpen,
+    isProviderDialogOpen,
+    isModelDialogOpen,
     isThemeDialogOpen,
     isEditorDialogOpen,
     showPrivacyNotice,
@@ -955,12 +993,21 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </OverflowProvider>
               )}
             </>
-          ) : isAuthDialogOpen ? (
+          ) : isProviderDialogOpen ? (
             <Box flexDirection="column">
-              <AuthDialog
-                onSelect={handleAuthSelect}
+              <ProviderDialog
+                onSelect={handleProviderSelect}
                 settings={settings}
-                initialErrorMessage={authError}
+                initialErrorMessage={providerError}
+                onTriggerAuth={handleTriggerAuth}
+              />
+            </Box>
+          ) : isModelDialogOpen ? (
+            <Box flexDirection="column">
+              <ModelDialog
+                onSelect={handleModelSelect}
+                settings={settings}
+                initialErrorMessage={modelError}
               />
             </Box>
           ) : isEditorDialogOpen ? (
@@ -1108,7 +1155,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
           <Footer
-            model={currentModel}
+            model={settings.merged.model || currentModel}
             targetDir={config.getTargetDir()}
             debugMode={config.getDebugMode()}
             branchName={branchName}

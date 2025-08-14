@@ -1,13 +1,16 @@
-# Gemini CLI
+# Codora CLI
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+This repository contains the Codora CLI (a fork of Google’s Gemini CLI) – a command-line AI workflow tool that connects to your tools, understands your code and accelerates your workflows.
 
-This repository contains the Gemini CLI, a command-line AI workflow tool that connects to your
-tools, understands your code and accelerates your workflows.
+Why fork?
 
-With the Gemini CLI you can:
+- Add official multi-provider support while staying close to upstream for easy syncing
+- Providers supported today: Gemini (default), Ollama, AWS Bedrock, OpenAI
+- Enable provider selection via `--provider` or env (`CODORA_PROVIDER`) and per-provider default models via env (e.g. `CODORA_DEFAULT_MODEL_OLLAMA`)
+  tools, understands your code and accelerates your workflows.
+
+With the Codora CLI you can:
 
 - Query and edit large codebases in and beyond Gemini's 1M token context window.
 - Generate new apps from PDFs or sketches, using Gemini's multimodal capabilities.
@@ -20,7 +23,7 @@ With the Gemini CLI you can:
 
 ## Quickstart
 
-You have two options to install Gemini CLI.
+You have two options to install Codora CLI.
 
 ### With Node
 
@@ -40,7 +43,7 @@ You have two options to install Gemini CLI.
    Then, run the CLI from anywhere:
 
    ```bash
-   gemini
+   codora
    ```
 
 ### With Homebrew
@@ -55,7 +58,7 @@ You have two options to install Gemini CLI.
    Then, run the CLI from anywhere:
 
    ```bash
-   gemini
+   codora
    ```
 
 ### Common Configuration steps
@@ -63,9 +66,9 @@ You have two options to install Gemini CLI.
 3. **Pick a color theme**
 4. **Authenticate:** When prompted, sign in with your personal Google account. This will grant you up to 60 model requests per minute and 1,000 model requests per day using Gemini.
 
-You are now ready to use the Gemini CLI!
+You are now ready to use the Codora CLI!
 
-### Use a Gemini API key:
+### Use a Gemini API key (default provider):
 
 The Gemini API provides a free tier with [100 requests per day](https://ai.google.dev/gemini-api/docs/rate-limits#free-tier) using Gemini 2.5 Pro, control over which model you use, and access to higher rate limits (with a paid plan):
 
@@ -96,14 +99,14 @@ For other authentication methods, including Google Workspace accounts, see the [
 
 ## Examples
 
-Once the CLI is running, you can start interacting with Gemini from your shell.
+Once the CLI is running, you can start interacting with Codora from your shell.
 
 You can start a project from a new directory:
 
 ```sh
 cd new-project/
-gemini
-> Write me a Gemini Discord bot that answers questions using a FAQ.md file I will provide
+codora
+> Write me a bot that answers questions using a FAQ.md file I will provide
 ```
 
 Or work with an existing project:
@@ -111,7 +114,7 @@ Or work with an existing project:
 ```sh
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
-gemini
+codora
 > Give me a summary of all of the changes that went in yesterday
 ```
 
