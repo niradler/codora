@@ -46,6 +46,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_OLLAMA = 'ollama',
 }
 
 export type ContentGeneratorConfig = {
@@ -122,12 +123,12 @@ export async function createContentGenerator(
   const providerName = (globalThis as any)?.process?.env?.CODORA_PROVIDER as
     | string
     | undefined;
-  if (providerName) {
+  if (providerName && providerName !== 'gemini') {
     try {
       const moduleName = '@codora/providers';
       const providersModule = await import(moduleName);
       const provider = providersModule.createProvider({
-        provider: providerName as 'ollama' | 'bedrock' | 'gemini',
+        provider: providerName as 'ollama' | 'bedrock' | 'openai',
         model: config.model,
         proxy: config.proxy,
         authType: config.authType,

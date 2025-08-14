@@ -16,6 +16,7 @@ interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
   settings: LoadedSettings;
   initialErrorMessage?: string | null;
+  selectedProvider?: string;
 }
 
 function parseDefaultAuthType(
@@ -34,6 +35,7 @@ export function AuthDialog({
   onSelect,
   settings,
   initialErrorMessage,
+  selectedProvider,
 }: AuthDialogProps): React.JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string | null>(() => {
     if (initialErrorMessage) {
@@ -59,29 +61,55 @@ export function AuthDialog({
     }
     return null;
   });
-  const items = [
-    {
-      label: 'Login with Google',
-      value: AuthType.LOGIN_WITH_GOOGLE,
-    },
-    ...(process.env.CLOUD_SHELL === 'true'
-      ? [
-          {
-            label: 'Use Cloud Shell user credentials',
-            value: AuthType.CLOUD_SHELL,
-          },
-        ]
-      : []),
-    {
-      label: 'Use Gemini API Key',
-      value: AuthType.USE_GEMINI,
-    },
-    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
-  ];
+  const getItemsForProvider = (provider?: string) => {
+    if (
+      provider === 'ollama' ||
+      provider === 'bedrock' ||
+      provider === 'openai'
+    ) {
+      return [
+        {
+          label: 'No authentication required',
+          value: 'none' as any,
+        },
+      ];
+    }
+
+    // Default to Gemini auth options
+    return [
+      {
+        label: 'Login with Google',
+        value: AuthType.LOGIN_WITH_GOOGLE,
+      },
+      ...(process.env.CLOUD_SHELL === 'true'
+        ? [
+            {
+              label: 'Use Cloud Shell user credentials',
+              value: AuthType.CLOUD_SHELL,
+            },
+          ]
+        : []),
+      {
+        label: 'Use Gemini API Key',
+        value: AuthType.USE_GEMINI,
+      },
+      { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    ];
+  };
+
+  const items = getItemsForProvider(selectedProvider);
 
   const initialAuthIndex = items.findIndex((item) => {
     if (settings.merged.selectedAuthType) {
       return item.value === settings.merged.selectedAuthType;
+    }
+
+    if (
+      selectedProvider === 'ollama' ||
+      selectedProvider === 'bedrock' ||
+      selectedProvider === 'openai'
+    ) {
+      return item.value === 'none';
     }
 
     const defaultAuthType = parseDefaultAuthType(
@@ -95,11 +123,17 @@ export function AuthDialog({
       return item.value === AuthType.USE_GEMINI;
     }
 
-    return item.value === AuthType.LOGIN_WITH_GOOGLE;
+    return 0;
   });
 
-  const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethod(authMethod);
+  const handleAuthSelect = (authMethod: AuthType | 'none') => {
+    if (authMethod === 'none') {
+      setErrorMessage(null);
+      onSelect(undefined, SettingScope.User);
+      return;
+    }
+
+    const error = validateAuthMethod(authMethod, selectedProvider);
     if (error) {
       setErrorMessage(error);
     } else {
@@ -134,9 +168,15 @@ export function AuthDialog({
       padding={1}
       width="100%"
     >
-      <Text bold>Get started</Text>
+      <Text bold>Authentication</Text>
       <Box marginTop={1}>
-        <Text>How would you like to authenticate for this project?</Text>
+        <Text>
+          {selectedProvider === 'ollama' ||
+          selectedProvider === 'bedrock' ||
+          selectedProvider === 'openai'
+            ? `Configure authentication for ${selectedProvider}:`
+            : 'How would you like to authenticate for this project?'}
+        </Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect

@@ -7,8 +7,16 @@
 import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment } from './settings.js';
 
-export const validateAuthMethod = (authMethod: string): string | null => {
+export const validateAuthMethod = (
+  authMethod: string,
+  provider?: string,
+): string | null => {
   loadEnvironment();
+
+  if (provider && provider !== 'gemini') {
+    return null;
+  }
+
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.CLOUD_SHELL

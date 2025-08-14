@@ -67,6 +67,7 @@ export interface AccessibilitySettings {
 export interface Settings {
   theme?: string;
   customThemes?: Record<string, CustomTheme>;
+  selectedProvider?: string;
   selectedAuthType?: AuthType;
   useExternalAuth?: boolean;
   sandbox?: boolean | string;
